@@ -20,6 +20,15 @@ dependencies {
     // (in a separate module for demo project and in testMain).
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
+
+    val voyagerVersion = "1.1.0-beta02"
+    implementation("cafe.adriel.voyager:voyager-navigator:$voyagerVersion")
+
+    val retrofitVersion = "2.11.0"
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-gson:$retrofitVersion")
+
+    implementation("io.coil-kt.coil3:coil-compose:3.0.0")
 }
 
 compose.desktop {
