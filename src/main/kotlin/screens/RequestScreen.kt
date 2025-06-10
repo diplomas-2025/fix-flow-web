@@ -2,6 +2,7 @@ package screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,8 +18,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -83,6 +86,19 @@ data class RequestScreen(
                             status = it,
                             token = "Bearer " + preferences.get("token", null)
                         )
+
+                        request = RetrofitClient.instance.getRequestById(
+                            id = id,
+                            token = "Bearer " + preferences.get("token", null)
+                        )
+                    }
+                },
+                onRequestRefresh = {
+                    scope.launch {
+                        request = RetrofitClient.instance.getRequestById(
+                            id = id,
+                            token = "Bearer " + preferences.get("token", null)
+                        )
                     }
                 }
             )
@@ -96,32 +112,58 @@ fun RequestDetailScreen(
     user: UserEntityDto,
     messages: List<CommentEntityDto>,
     onSendMessage: (String) -> Unit,
-    onStatusChanged: (RequestStatus) -> Unit
+    onStatusChanged: (RequestStatus) -> Unit,
+    onRequestRefresh: () -> Unit
 ) {
     val navigator = LocalNavigator.currentOrThrow
+    val scope = rememberCoroutineScope()
     var newMessage by remember { mutableStateOf("") }
+    var feedbackDialog by remember { mutableStateOf(false) }
+
+    val preferences = remember { Preferences.userRoot().node("user") }
+
+    if (feedbackDialog) {
+        FeedbackDialog(
+            onDismiss = { feedbackDialog = false },
+            onSubmit = { rating, text ->
+                scope.launch {
+                    RetrofitClient.instance.feedback(
+                        id = request.id,
+                        text = text,
+                        rating = rating,
+                        token = "Bearer " + preferences.get("token", null)
+                    )
+
+                    onRequestRefresh()
+                }
+            }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    navigator.pop()
-                }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { navigator.pop() }
+                ) {
+                    Icon(
+                        Icons.Default.KeyboardArrowLeft,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colors.primary
+                    )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = "Заявка: ${request.title}",
-                    style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.h6.copy(fontWeight = FontWeight.Bold)
                 )
             }
+
             if (user.role == UserRole.ItSupport) {
                 ChangeStatusButton(
                     request = request,
@@ -130,14 +172,94 @@ fun RequestDetailScreen(
             }
         }
 
-        Text("Описание: ${request.description}", style = TextStyle(fontSize = 16.sp))
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Статус: ${request.status.title}", style = TextStyle(fontSize = 16.sp))
-        Spacer(modifier = Modifier.height(8.dp))
+        // Основная карточка с информацией
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            elevation = 4.dp,
+            contentColor = MaterialTheme.colors.surface,
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Блок с основной информацией
+                InfoItem(
+                    title = "Описание",
+                    value = request.description,
+                    icon = Icons.Filled.Edit
+                )
 
-        // Даты
-        Text("Дата: ${parseDate(request.createdAt)}", style = TextStyle(fontSize = 12.sp, color = Color.Gray))
-        Spacer(modifier = Modifier.height(16.dp))
+                Divider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                )
+
+                // Блок со статусом и категорией
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        InfoItem(
+                            title = "Статус",
+                            value = request.status.title,
+                            icon = Icons.Filled.Info
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        InfoItem(
+                            title = "Категория",
+                            value = request.category.name,
+                            icon = Icons.Filled.Edit
+                        )
+                    }
+                }
+
+                // Обратная связь (если есть)
+                request.satisfactionRating?.let {
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                    )
+                    InfoItem(
+                        title = "Рейтинг",
+                        value = "$it/5",
+                        icon = Icons.Filled.Star,
+                        iconTint = Color(0xFFFFC107)
+                    )
+                }
+
+                request.feedbackText?.let {
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                    )
+                    InfoItem(
+                        title = "Обратная связь",
+                        value = it,
+                        icon = Icons.Filled.Edit
+                    )
+                }
+
+                // Дата внизу карточки
+                Text(
+                    text = "Создано: ${parseDate(request.createdAt)}",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 8.dp).align(Alignment.End)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        if (request.satisfactionRating == null && request.status == RequestStatus.Closed && user.role == UserRole.Employee) {
+            Button(
+                onClick = {
+                    feedbackDialog = !feedbackDialog
+                }
+            ) {
+                Text(text = "Оставить обратную связь")
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
 
         // Список сообщений (чат)
         Text("Сообщения:", style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold))
@@ -160,8 +282,103 @@ fun RequestDetailScreen(
             },
             onSendMessage = {
                 onSendMessage(newMessage)
+                newMessage = ""
             }
         )
+    }
+}
+
+@Composable
+fun FeedbackDialog(
+    initialRating: Int = 0,
+    initialText: String = "",
+    onDismiss: () -> Unit,
+    onSubmit: (rating: Int, feedback: String) -> Unit
+) {
+    var rating by remember { mutableStateOf(initialRating) }
+    var feedbackText by remember { mutableStateOf(initialText) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "Оставьте обратную связь", style = MaterialTheme.typography.h6)
+        },
+        text = {
+            Column {
+                Text(text = "Оцените от 1 до 5", style = MaterialTheme.typography.subtitle1)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row {
+                    // Рейтинг: 5 иконок звезд
+                    for (i in 1..5) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Рейтинг $i",
+                            tint = if (i <= rating) Color(0xFFFFC107) else Color.Gray,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clickable { rating = i }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = feedbackText,
+                    onValueChange = { feedbackText = it },
+                    placeholder = { Text("Введите комментарий...") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (rating > 0) {
+                        onSubmit(rating, feedbackText)
+                        onDismiss()
+                    }
+                },
+                enabled = rating > 0 // Не даём отправить без оценки
+            ) {
+                Text("Отправить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+
+@Composable
+fun InfoItem(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    iconTint: Color = MaterialTheme.colors.primary
+) {
+    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = iconTint,
+            modifier = Modifier.size(20.dp).padding(top = 2.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.caption,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.body1,
+                color = MaterialTheme.colors.onSurface
+            )
+        }
     }
 }
 
@@ -171,47 +388,61 @@ fun MessageInputField(
     onMessageChange: (String) -> Unit,
     onSendMessage: () -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
-            .background(Color(0xFFF8F9FA), shape = RoundedCornerShape(24.dp)),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        color = MaterialTheme.colors.surface,
+        shape = RoundedCornerShape(30.dp),
+        elevation = 8.dp
     ) {
-        OutlinedTextField(
-            value = newMessage,
-            onValueChange = onMessageChange,
-            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(
-                onSend = { onSendMessage() }
-            ),
-            textStyle = TextStyle(fontSize = 16.sp),
-            placeholder = { Text("Введите сообщение...", color = Color.Gray) },
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                backgroundColor = Color.Transparent,
-                cursorColor = Color(0xFF1E88E5),
-                focusedBorderColor = Color(0xFF1E88E5),
-                unfocusedBorderColor = Color.LightGray
-            ),
-            shape = RoundedCornerShape(24.dp),
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp)
-        )
-
-        IconButton(
-            onClick = onSendMessage,
-            modifier = Modifier
-                .padding(8.dp)
-                .size(48.dp)
-                .background(Color(0xFF1E88E5), shape = CircleShape)
-                .clickable { onSendMessage() }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "Отправить",
-                tint = Color.White
+            OutlinedTextField(
+                value = newMessage,
+                onValueChange = onMessageChange,
+                placeholder = { Text("Введите сообщение...", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f)) },
+                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = { onSendMessage() }
+                ),
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    backgroundColor = MaterialTheme.colors.surface,
+                    cursorColor = MaterialTheme.colors.primary,
+                    focusedBorderColor = MaterialTheme.colors.primary,
+                    unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.2f),
+                    textColor = MaterialTheme.colors.onSurface
+                ),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
             )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            IconButton(
+                onClick = onSendMessage,
+                modifier = Modifier
+                    .size(48.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false
+                    )
+                    .background(MaterialTheme.colors.primary, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Отправить",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
@@ -222,29 +453,49 @@ fun MessageInputField(
 fun MessageCard(message: CommentEntityDto) {
     Card(
         modifier = Modifier
-            .padding(8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        elevation = 2.dp
+        shape = RoundedCornerShape(12.dp),
+        elevation = 6.dp,
+        backgroundColor = MaterialTheme.colors.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.1f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = message.user.username + " (${message.user.role.title})",
-                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "User Icon",
+                    tint = MaterialTheme.colors.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = message.user.username,
+                        style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colors.onSurface
+                    )
+                    Text(
+                        text = message.user.role.title,
+                        style = MaterialTheme.typography.caption.copy(color = MaterialTheme.colors.primaryVariant)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = message.comment,
-                style = TextStyle(fontSize = 14.sp, color = Color.Black)
+                style = MaterialTheme.typography.body1,
+                color = MaterialTheme.colors.onSurface,
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
                 Text(
                     text = parseDate(message.createdAt),
-                    style = TextStyle(fontSize = 12.sp, color = Color.Gray)
+                    style = MaterialTheme.typography.caption.copy(color = Color.Gray)
                 )
             }
         }
@@ -256,64 +507,73 @@ fun ChangeStatusButton(request: RequestEntityDto, onStatusChanged: (RequestStatu
     var showDialog by remember { mutableStateOf(false) }
     var selectedStatus by remember { mutableStateOf(request.status) }
 
-    // Кнопка для открытия диалога изменения статуса
     Button(
         onClick = { showDialog = true },
-        shape = MaterialTheme.shapes.medium,
-        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.primary)
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.primary),
+        elevation = ButtonDefaults.elevation(defaultElevation = 8.dp, pressedElevation = 12.dp),
+        modifier = Modifier
+            .height(48.dp)
+            .fillMaxWidth(0.6f)
     ) {
-        Text(text = "Изменить статус", color = Color.White)
+        Text(
+            text = "Изменить статус",
+            color = Color.White,
+            style = MaterialTheme.typography.button
+        )
     }
 
-    // Диалог выбора статуса
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = {},
             text = {
                 Column {
-                    Text("Выберите новый статус", style = MaterialTheme.typography.h6)
-
-                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = "Выберите новый статус",
+                        style = MaterialTheme.typography.h6,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
                     RequestStatus.entries.forEach { status ->
-                        // Создаем карточки для статусов
-                        Card(
+                        val isSelected = status == selectedStatus
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(3.dp)
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colors.surface)
+                                .border(
+                                    width = if (isSelected) 2.dp else 0.dp,
+                                    color = if (isSelected) MaterialTheme.colors.primary else Color.Transparent,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
                                 .clickable {
                                     selectedStatus = status
-                                    onStatusChanged(status)  // Передаем выбранный статус
-                                    showDialog = false  // Закрываем диалог
-                                },
-                            shape = MaterialTheme.shapes.medium,
-                            elevation = 4.dp,
-                            border = BorderStroke(
-                                if (status == selectedStatus) 3.dp else 0.dp,
-                                MaterialTheme.colors.primary
-                            )
-                        ) {
+                                }
+                        )  {
                             Row(
                                 modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth(),
+                                    .padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Можно добавить иконки для статусов
+                                val icon = when (status) {
+                                    RequestStatus.Open -> Icons.Default.Info
+                                    RequestStatus.InProgress -> Icons.Default.Build
+                                    RequestStatus.Closed -> Icons.Default.Check
+                                }
                                 Icon(
-                                    imageVector = when (status) {
-                                        RequestStatus.Open -> Icons.Default.Info
-                                        RequestStatus.InProgress -> Icons.Default.Build
-                                        RequestStatus.Closed -> Icons.Default.Check
-                                    },
+                                    imageVector = icon,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colors.primary
+                                    tint = if (isSelected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(28.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = status.title,
-                                    style = MaterialTheme.typography.body1.copy(fontWeight = FontWeight.Bold)
+                                    style = MaterialTheme.typography.subtitle1.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface
+                                    )
                                 )
                             }
                         }
@@ -323,25 +583,30 @@ fun ChangeStatusButton(request: RequestEntityDto, onStatusChanged: (RequestStatu
             confirmButton = {
                 Button(
                     onClick = {
-                        // Можно добавить логику для подтверждения изменений
+                        onStatusChanged(selectedStatus)
                         showDialog = false
                     },
-                    shape = MaterialTheme.shapes.medium
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 ) {
                     Text("Подтвердить")
                 }
             },
             dismissButton = {
-                Button(
-                    onClick = { showDialog = false },
-                    shape = MaterialTheme.shapes.medium
+                TextButton(
+                    onClick = { showDialog = false }
                 ) {
                     Text("Отменить")
                 }
-            }
+            },
+            shape = RoundedCornerShape(20.dp),
+            backgroundColor = MaterialTheme.colors.background,
+            modifier = Modifier.padding(16.dp)
         )
     }
 }
+
+
 
 fun parseDate(dateString: String): String {
     val instant = Instant.parse(dateString) // Преобразуем в Instant

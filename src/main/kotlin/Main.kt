@@ -18,41 +18,23 @@ import cafe.adriel.voyager.navigator.Navigator
 import screens.AuthScreen
 import java.util.prefs.Preferences
 
-// Primary Color (deep blue shade)
-val CustomPrimaryColor = Color(0xFF1E3A8A)  // Darker blue, vibrant and professional
+val CustomPrimaryColor = Color(0xFF2E7D32)     // Тёмно-зелёный
+val CustomSecondaryColor = Color(0xFF8BC34A)   // Светло-зелёный
+val CustomBackgroundColor = Color(0xFFF1F8E9)  // Очень светлый зелёный фон
+val CustomErrorColor = Color(0xFFC62828)       // Красный
+val CustomSurfaceColor = Color(0xFFFFFFFF)     // Белый
+val CustomOnSurfaceColor = Color(0xFF212121)   // Тёмно-серый текст
+val CustomOnPrimaryColor = Color(0xFFFFFFFF)   // Белый текст
+val CustomAccentColor = Color(0xFFFFC107)      // Жёлтый акцент
 
-// Secondary Color (soft teal)
-val CustomSecondaryColor = Color(0xFF4FD1C5)  // Fresh teal, adds contrast and energy
-
-// Background Color (light neutral)
-val CustomBackgroundColor = Color(0xFFF0F4F8)  // Soft, light background to make content stand out
-
-// Error Color (soft red for alerts)
-val CustomErrorColor = Color(0xFFEF4444)  // Modern red for error messages, soft yet noticeable
-
-// Optional Additional Colors
-
-// Surface Color (white with a slight shade)
-val CustomSurfaceColor = Color(0xFFFFFFFF)  // White for surfaces and cards
-
-// On Surface Color (dark gray for text on white surfaces)
-val CustomOnSurfaceColor = Color(0xFF333333)  // Dark gray for text and icons on surfaces
-
-// On Primary Color (light text on primary background)
-val CustomOnPrimaryColor = Color(0xFFFFFFFF)  // White text to contrast with primary color
-
-// Accent Color (for highlights or call to actions)
-val CustomAccentColor = Color(0xFF9B56FF)  // A light purple accent for highlights or focus areas
-
-
-private val CustomColors = lightColors(
+val CustomColors = lightColors(
     primary = CustomPrimaryColor,
     secondary = CustomSecondaryColor,
     background = CustomBackgroundColor,
     surface = CustomSurfaceColor,
     error = CustomErrorColor,
     onPrimary = CustomOnPrimaryColor,
-    onSecondary = CustomOnPrimaryColor,
+    onSecondary = Color.Black,
     onBackground = CustomOnSurfaceColor,
     onSurface = CustomOnSurfaceColor,
     onError = Color.White
@@ -81,7 +63,7 @@ fun main() = application {
         state = rememberWindowState(
             size = DpSize(1200.dp, 800.dp)
         ),
-        title = "ООО «ВАРНОФФ»"
+        title = "ООО «ПромТехСервис»"
     ) {
         App()
     }

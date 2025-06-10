@@ -20,8 +20,23 @@ interface ApiService {
     suspend fun createRequest(
         @Header("Authorization") token: String,
         @Query("title") title: String,
-        @Query("desc") desc: String
+        @Query("desc") desc: String,
+        @Query("catId") catId: Int,
+        @Query("priority") priority: String
     ): Response<Unit?>
+
+    @POST("main/requests/{id}/feedback")
+    suspend fun feedback(
+        @Path("id") id: Int,
+        @Query("rating") rating: Int,
+        @Query("text") text: String,
+        @Header("Authorization") token: String,
+    ): Response<Unit?>
+
+    @GET("main/categories")
+    suspend fun getAllCategories(
+        @Header("Authorization") token: String,
+    ): Response<List<Category>>
 
     @GET("main/requests/{id}/commands")
     suspend fun getAllCommands(
@@ -58,7 +73,7 @@ interface ApiService {
 
 // Retrofit instance
 object RetrofitClient {
-    private const val BASE_URL = "https://spotdiff.ru/tech-flow-api/"
+    private const val BASE_URL = "https://spotdiff.ru/fix-flow-api/"
 
     val instance: ApiService by lazy {
         Retrofit.Builder()
@@ -80,10 +95,19 @@ data class RequestEntityDto(
     val description: String,
     val status: RequestStatus,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    val category: Category,
+    val priority: String,
+    val satisfactionRating: Int?,
+    val feedbackText: String?
 )
 data class CommentEntityDto(val id: Int, val comment: String, val user: UserEntityDto, val createdAt: String)
 data class UserEntityDto(val id: Int, val username: String, val role: UserRole, val email: String, val createdAt: String)
+
+data class Category(
+    val id: Int,
+    val name: String
+)
 
 enum class UserRole(val title: String) {
     Employee("Сотрудник"),
