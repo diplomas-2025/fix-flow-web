@@ -477,7 +477,7 @@ fun MessageCard(message: CommentEntityDto) {
                     )
                     Text(
                         text = message.user.role.title,
-                        style = MaterialTheme.typography.caption.copy(color = MaterialTheme.colors.primaryVariant)
+                        style = MaterialTheme.typography.caption.copy(color = MaterialTheme.colors.primary)
                     )
                 }
             }
