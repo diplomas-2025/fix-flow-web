@@ -64,6 +64,7 @@ class AuthScreen : Screen {
                         errorMessage = "Неверный email или пароль"
                     }
                 } catch (e: Exception) {
+                    email = e.message.toString()
                     errorMessage = "Ошибка подключения. Попробуйте позже."
                 }
                 isLoading = false

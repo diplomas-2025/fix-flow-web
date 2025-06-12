@@ -1,9 +1,12 @@
 package api
 
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import retrofit2.Response
 import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
+import okhttp3.MediaType.Companion.toMediaType
 
 // API Service interface
 interface ApiService {
@@ -78,16 +81,20 @@ object RetrofitClient {
     val instance: ApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(Json { ignoreUnknownKeys = true }.asConverterFactory( "application/json".toMediaType()))
             .build()
             .create(ApiService::class.java)
     }
 }
 
 // Data classes
+@Serializable
 data class SignUpParams(val username: String, val email: String, val password: String)
+@Serializable
 data class SignInParams(val email: String, val password: String)
+@Serializable
 data class JwtResponseDto(val userId: Int, val accessToken: String, val refreshToken: String)
+@Serializable
 data class RequestEntityDto(
     val id: Int,
     val user: UserEntityDto,
@@ -101,9 +108,13 @@ data class RequestEntityDto(
     val satisfactionRating: Int?,
     val feedbackText: String?
 )
+@Serializable
 data class CommentEntityDto(val id: Int, val comment: String, val user: UserEntityDto, val createdAt: String)
+
+@Serializable
 data class UserEntityDto(val id: Int, val username: String, val role: UserRole, val email: String, val createdAt: String)
 
+@Serializable
 data class Category(
     val id: Int,
     val name: String
